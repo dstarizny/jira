@@ -75,7 +75,7 @@ class ResilientSession(Session):
     """
 
     def __init__(self, timeout=None):
-        self.max_retries = 3
+        self.max_retries = 10
         self.timeout = timeout
         super(ResilientSession, self).__init__()
 
@@ -84,6 +84,7 @@ class ResilientSession(Session):
 
     def __recoverable(self, response, url, request, counter=1):
         msg = response
+        print("ATTEMPTING RECOVERY")
         if isinstance(response, ConnectionError):
             logging.warning(
                 "Got ConnectionError [%s] errno:%s on %s %s\n%s\n%s"
@@ -97,17 +98,21 @@ class ResilientSession(Session):
                 )
             )
         if hasattr(response, "status_code"):
-            if response.status_code in [502, 503, 504, 401]:
+            if response.status_code in [500, 502, 503, 504, 401]:
                 # 401 UNAUTHORIZED still randomly returned by Atlassian Cloud as of 2017-01-16
                 msg = "%s %s" % (response.status_code, response.reason)
                 # 2019-07-25: Disabled recovery for codes above^
                 return False
+            elif response.status_code == 429:
+                pass
             elif not (
                 response.status_code == 200
                 and len(response.content) == 0
                 and "X-Seraph-LoginReason" in response.headers
-                and "AUTHENTICATED_FAILED" in response.headers["X-Seraph-LoginReason"]
+                and "AUTHENTICATED_FAILED" in response.headers["X-Seraph-LoginReason"] 
             ):
+                print("returning false of that retry..")
+                print(response.content)
                 return False
             else:
                 msg = "Atlassian's bug https://jira.atlassian.com/browse/JRA-41559"
@@ -150,7 +155,7 @@ class ResilientSession(Session):
                 )
                 exception = e
             retry_number += 1
-
+            print ("RETRYING")
             if retry_number <= self.max_retries:
                 response_or_exception = response if response is not None else exception
                 if self.__recoverable(

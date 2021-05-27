@@ -4062,6 +4062,14 @@ class JIRA(object):
 
         return json_loads(r)
 
+    def release_version(self, id):
+        payload = {'released' : True}
+        url = self._options["server"] + "/rest/api/2/version/%s" % id
+        r = self._session.put(url, data=json.dumps(payload))
+
+        return json_loads(r)
+
+        
     def incompletedIssuesEstimateSum(self, board_id, sprint_id):
         """Return the total incompleted points this sprint."""
         return self._get_json(
